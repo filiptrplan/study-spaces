@@ -1,0 +1,106 @@
+# Self-hosted deployment on one VPS. Copy deploy/vps/env.example to .env, then:
+#   docker compose -f compose.prod.yaml up -d --build
+x-service: &service
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  db:
+    <<: *service
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: study_spaces
+      POSTGRES_USER: study_spaces
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U study_spaces -d study_spaces"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    <<: *service
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        INSTALL_DEV: "false"
+    environment:
+      DATABASE_URL: postgresql+psycopg://study_spaces:${POSTGRES_PASSWORD}@db:5432/study_spaces
+      AUTH_MODE: ${AUTH_MODE:-guest}
+      GUEST_COOKIE_SECURE: ${GUEST_COOKIE_SECURE:-true}
+      USER_ID_HEADER: ${USER_ID_HEADER:-X-User-Id}
+      USER_NAME_HEADER: ${USER_NAME_HEADER:-X-User-Name}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-[]}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-[]}
+      SOCIAL_ENABLED: ${SOCIAL_ENABLED:-true}
+      # Demo mode is for trying the app out only; never let a client pick its identity.
+      DUMMY_AUTH_ALLOW_HEADER: "false"
+      DUMMY_ADMIN_ALLOW_HEADER: "false"
+      DUMMY_IS_ADMIN: ${DUMMY_IS_ADMIN:-false}
+      MAP_CACHE_DIR: /app/.cache/campus-map
+    volumes:
+      - map_cache:/app/.cache
+    networks: [app, data]
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        alembic upgrade head
+        && python -m app.features.campus_map.importer
+        && uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  web:
+    <<: *service
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        SOCIAL_ENABLED: ${SOCIAL_ENABLED:-true}
+    networks: [app]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Plain HTTP entry point. Removes client-sent identity headers; only the auth snippet sets them.
+  edge:
+    <<: *service
+    image: caddy:2.11.2-alpine
+    environment:
+      USER_ID_HEADER: ${USER_ID_HEADER:-X-User-Id}
+      USER_NAME_HEADER: ${USER_NAME_HEADER:-X-User-Name}
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:80"
+    volumes:
+      - ./deploy/vps/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/vps/auth:/etc/caddy/auth:ro
+    networks: [app, default]
+    depends_on: [web]
+
+networks:
+  app:
+  data:
+    internal: true
+
+volumes:
+  postgres_data:
+  map_cache:

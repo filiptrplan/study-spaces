@@ -1,0 +1,16 @@
+# Plain HTTP only: TLS is terminated in front of this (your own proxy or load balancer).
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	# `route` keeps this order: strip first, so only the auth snippet can set identity.
+	route {
+		request_header -{$USER_ID_HEADER:X-User-Id}
+		request_header -{$USER_NAME_HEADER:X-User-Name}
+		import /etc/caddy/auth/*.caddy
+		reverse_proxy web:8080
+	}
+}

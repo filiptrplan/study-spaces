@@ -65,7 +65,7 @@ Manage rooms and people through an admin dashboard. Create room layouts, print o
 | Database | PostgreSQL 17 (psycopg 3) |
 | Real-time | Server-sent events (`/api/v1/events`) |
 | Tooling | uv (Python deps), npm (JS deps), Ruff, pytest, ESLint, Prettier, `node --test` |
-| Runtime / deploy | Docker Compose, Caddy, GitHub Actions (SSH deploy, per-PR previews) |
+| Runtime / deploy | Docker Compose, Caddy |
 
 ## Quickstart
 
@@ -85,5 +85,7 @@ docker compose up --build -d --wait
 
 npm run dev --prefix frontend
 ```
+
+To run it on your own server, see [Deploy on your own server](docs/vps.md).
 
 For codebase orientation and an indepth guide on serving it locally, read the [Orientation Guide](ORIENTATION.md)

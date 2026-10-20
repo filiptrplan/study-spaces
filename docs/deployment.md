@@ -1,5 +1,7 @@
 # Deployment
 
+This page describes the ETH hackathon VM setup. Its GitHub Actions workflow has been removed from the repo, so the CI and preview parts below are historical. To self-host, see [vps.md](vps.md).
+
 GitHub Actions builds and deploys this app over SSH to `viscon@02-direct.viscon-hackathon.ch`. The public URL is https://02.hackathon.ethz.ch. A shared Caddy gateway routes production and PR previews to their own Caddy web servers, which serve React and forward `/api` to FastAPI. Each environment has its own backend and PostgreSQL volume.
 
 The organizers’ managed proxy terminates TLS and authenticates users before forwarding to **VM port 8080**. The existing router in `/home/viscon/router` owns that port. Its Caddy configuration serves the Polymaps AR build at `/ar/` and forwards every other path to `localhost:8081`.

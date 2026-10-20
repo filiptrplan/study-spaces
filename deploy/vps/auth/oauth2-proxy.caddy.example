@@ -1,0 +1,10 @@
+# Rename to oauth2-proxy.caddy (any *.caddy in this folder is loaded) and run oauth2-proxy
+# next to the app. It sets the user's email and name as response headers, and Caddy copies
+# them to the headers the backend reads (USER_ID_HEADER / USER_NAME_HEADER in .env).
+handle /oauth2/* {
+	reverse_proxy oauth2-proxy:4180
+}
+forward_auth oauth2-proxy:4180 {
+	uri /oauth2/auth
+	copy_headers X-Auth-Request-Email>X-User-Id X-Auth-Request-User>X-User-Name
+}
