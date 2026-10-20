@@ -1,6 +1,9 @@
+from uuid import uuid5
+
 import pytest
 from pydantic import ValidationError
 
+from app.auth import USER_NAMESPACE
 from app.config import Settings
 
 
@@ -33,3 +36,9 @@ def test_timing_settings_can_be_overridden_by_environment(monkeypatch):
 def test_invalid_settings_are_rejected(overrides):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, **overrides)
+
+
+def test_admins_can_be_listed_by_email(monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", '["boss@example.com"]')
+    settings = Settings(_env_file=None)
+    assert settings.admin_ids == {uuid5(USER_NAMESPACE, "boss@example.com")}

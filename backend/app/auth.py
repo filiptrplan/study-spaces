@@ -1,4 +1,6 @@
+import secrets
 from base64 import b64encode
+from http.cookies import SimpleCookie
 from io import BytesIO
 from typing import Annotated
 from urllib.parse import unquote
@@ -9,6 +11,7 @@ from PIL import Image, ImageOps
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from starlette.requests import HTTPConnection
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import Settings, get_settings
 from app.database import get_session
@@ -20,15 +23,66 @@ router = APIRouter(prefix="/api/v1", tags=["auth"])
 MAX_PHOTO_BYTES = 12 * 1024 * 1024
 
 
+class GuestCookieMiddleware:
+    """In guest mode, give a browser without an account a random token cookie.
+
+    The token is only ever in this cookie; the user id is derived from it, so ids that
+    other users can see (friends, admin lists) can't be used to take over an account.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        settings = get_settings()
+        if scope["type"] != "http" or settings.auth_mode != "guest":
+            await self.app(scope, receive, send)
+            return
+        name = settings.guest_cookie_name
+        headers = dict(scope["headers"])
+        jar = SimpleCookie(headers.get(b"cookie", b"").decode("latin-1"))
+        if name in jar and len(jar[name].value) >= 32:
+            await self.app(scope, receive, send)
+            return
+        token = secrets.token_urlsafe(32)
+        # Requests run in this same call, so they see the new account too.
+        existing = headers.get(b"cookie", b"").decode("latin-1")
+        cookie = f"{existing}; {name}={token}" if existing else f"{name}={token}"
+        scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"cookie"]
+        scope["headers"].append((b"cookie", cookie.encode("latin-1")))
+        flags = "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax"
+        if settings.guest_cookie_secure:
+            flags += "; Secure"
+
+        async def send_with_cookie(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                message["headers"] = [
+                    *message.get("headers", []),
+                    (b"set-cookie", f"{name}={token}{flags}".encode("latin-1")),
+                ]
+            await send(message)
+
+        await self.app(scope, receive, send_with_cookie)
+
+
+def guest_name(user_id: UUID) -> str:
+    return f"Guest {user_id.int % 10000:04d}"
+
+
 def get_current_user(
     request: HTTPConnection, settings: Annotated[Settings, Depends(get_settings)]
 ) -> UUID:
     # HTTPConnection, not Request, so it also works for WebSocket routes.
     if settings.auth_mode == "proxy":
-        email = request.headers.get("X-User-Id", "").strip()
+        email = request.headers.get(settings.user_id_header, "").strip()
         if not email:
             raise HTTPException(status_code=401, detail="Authentication required")
         return uuid5(USER_NAMESPACE, email)
+    if settings.auth_mode == "guest":
+        token = request.cookies.get(settings.guest_cookie_name, "")
+        if len(token) < 32:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        return uuid5(USER_NAMESPACE, f"guest:{token}")
     if not settings.dummy_auth_allow_header:
         return settings.dummy_user_id
     try:
@@ -43,7 +97,7 @@ def get_current_admin(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> UUID:
     if settings.auth_mode != "demo":
-        if user_id in settings.admin_user_ids:
+        if user_id in settings.admin_ids:
             return user_id
         raise HTTPException(status_code=403, detail="Administrator access required")
     is_admin = settings.dummy_is_admin
@@ -74,9 +128,14 @@ def get_me(
     profile = session.get(UserProfile, user_id)
     if settings.auth_mode == "demo":
         name, email = "Demo user", None
+    elif settings.auth_mode == "guest":
+        name, email = guest_name(user_id), None
     else:
-        email = request.headers["X-User-Id"].strip()
-        name = unquote(request.headers.get("X-User-Name", "")).strip() or "Study Spaces user"
+        email = request.headers[settings.user_id_header].strip()
+        name = (
+            unquote(request.headers.get(settings.user_name_header, "")).strip()
+            or "Study Spaces user"
+        )
     # The app loads /me on sign-in. Register the public display profile once,
     # preserving subsequent profile edits and never using email as a public name.
     if profile is None:

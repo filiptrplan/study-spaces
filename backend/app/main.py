@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth import GuestCookieMiddleware
 from app.auth import router as auth_router
 from app.config import get_settings
 from app.database import engine, get_session
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="The Wurst Team API", version="0.1.0", lifespan=lifespan)
+app.add_middleware(GuestCookieMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,

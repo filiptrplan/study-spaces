@@ -326,3 +326,41 @@ def test_proxy_admin_allowlist_is_server_controlled(profile_client):
     assert client.get("/api/v1/admin/spaces", headers=owner).status_code == 200
     assert client.get("/api/v1/admin/spaces", headers=other).status_code == 403
     assert client.get("/api/v1/admin/spaces").status_code == 401
+
+
+def test_proxy_headers_are_configurable():
+    settings = {"auth_mode": "proxy", "user_id_header": "X-Auth-Request-Email"}
+    user = identity({"X-Auth-Request-Email": "me@example.com"}, **settings)
+    assert user == identity({"X-Auth-Request-Email": "me@example.com"}, **settings)
+    with pytest.raises(HTTPException):
+        identity({"X-User-Id": "me@example.com"}, **settings)
+
+
+@pytest.fixture
+def guest_settings(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "guest")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_guest_gets_a_private_cookie_account(guest_settings):
+    client = TestClient(app, base_url="https://testserver")
+    first = client.get("/api/v1/health")
+    cookie = first.headers["set-cookie"]
+    assert "guest_token=" in cookie and "HttpOnly" in cookie and "Secure" in cookie
+    # The browser now sends the cookie back and is not given a new one.
+    assert "set-cookie" not in client.get("/api/v1/health").headers
+    token = client.cookies["guest_token"]
+    settings = Settings(_env_file=None, auth_mode="guest")
+    request = Request({"type": "http", "headers": [(b"cookie", f"guest_token={token}".encode())]})
+    assert get_current_user(request, settings) == get_current_user(request, settings)
+    other = Request({"type": "http", "headers": [(b"cookie", b"guest_token=" + b"x" * 40)]})
+    assert get_current_user(other, settings) != get_current_user(request, settings)
+
+
+def test_guest_without_cookie_is_unauthenticated():
+    with pytest.raises(HTTPException):
+        identity({}, auth_mode="guest")
+    with pytest.raises(HTTPException):
+        identity({"cookie": "guest_token=short"}, auth_mode="guest")

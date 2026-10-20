@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
+from app.auth import get_current_user, guest_name
 from app.config import Settings, get_settings
 from app.database import get_session
 from app.features.events.hub import hub
@@ -70,11 +70,13 @@ def get_service(
     session: Annotated[Session, Depends(get_session)],
 ) -> SocialService:
     # Keep auth identity untouched and never publish email addresses to other users.
-    name = (
-        unquote(request.headers.get("X-User-Name", "")).strip() or "Study Spaces user"
-        if settings.auth_mode == "proxy"
-        else "Demo user"
-    )
+    if settings.auth_mode == "proxy":
+        name = unquote(request.headers.get(settings.user_name_header, "")).strip()
+        name = name or "Study Spaces user"
+    elif settings.auth_mode == "guest":
+        name = guest_name(user_id)
+    else:
+        name = "Demo user"
     return SocialService(session, settings, user_id, name)
 
 

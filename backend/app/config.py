@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,8 +19,16 @@ class Settings(BaseSettings):
     private_priority_window_minutes: int = Field(default=20, gt=0)
     public_reservation_window_minutes: int = Field(default=10, gt=0)
     break_budget_minutes: int = Field(default=30, gt=0)
-    auth_mode: Literal["proxy", "demo"] = "proxy"
+    auth_mode: Literal["proxy", "demo", "guest"] = "proxy"
+    # Guest mode: every browser gets its own anonymous account, kept in this cookie.
+    guest_cookie_name: str = "guest_token"
+    guest_cookie_secure: bool = True
+    # Proxy mode: the headers the authenticating reverse proxy sets.
+    user_id_header: str = "X-User-Id"
+    user_name_header: str = "X-User-Name"
     admin_user_ids: list[UUID] = Field(default_factory=list)
+    # Same as admin_user_ids, by the email the proxy sends in user_id_header.
+    admin_emails: list[str] = Field(default_factory=list)
     dummy_user_id: UUID = UUID("00000000-0000-0000-0000-000000000001")
     dummy_auth_allow_header: bool = True
     dummy_is_admin: bool = False
@@ -30,6 +38,14 @@ class Settings(BaseSettings):
     map_cache_dir: Path = BACKEND_DIR / ".cache" / "campus-map"
     # Floor plans written by scraper/extract_floors.py (served under /api/v1/map/floors).
     map_floors_dir: Path = BACKEND_DIR.parent / "scraper" / "floors"
+
+    @property
+    def admin_ids(self) -> set[UUID]:
+        # Imported here: app.auth imports this module.
+        from app.auth import USER_NAMESPACE
+
+        emails = (uuid5(USER_NAMESPACE, email.strip()) for email in self.admin_emails)
+        return {*self.admin_user_ids, *emails}
 
     @model_validator(mode="after")
     def validate_reservation_windows(self) -> "Settings":
