@@ -1,6 +1,8 @@
 # Study Spaces
 **The Wurst Team**
 
+> **Disclaimer:** This project was built during the ETH Zurich hackathon. It is a hackathon prototype, not an official ETH product, and is not affiliated with or endorsed by ETH Zurich.
+
 <img alt="The Study Spaces logo" src="assets/logo-dark.svg#gh-dark-mode-only" width="90%">
 <img alt="The Study Spaces logo" src="assets/logo-light.svg#gh-light-mode-only" width="90%">
 
