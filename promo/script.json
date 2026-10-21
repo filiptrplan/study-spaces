@@ -1,0 +1,59 @@
+{
+  "voice": "Xb7hH8MSUJpSbSDYk0k2",
+  "model": "eleven_v4",
+  "totalSeconds": 120,
+  "scenes": [
+    {
+      "id": "hook",
+      "vo": "It's nine a.m. in finals week. You've got a laptop, a deadline, and nowhere to sit."
+    },
+    {
+      "id": "problem",
+      "vo": "Every room looks full. But half those seats are held for people who aren't even there. And from the hallway, you'd never know."
+    },
+    {
+      "id": "title",
+      "vo": "Meet Study Spaces. Every study room on campus, live, in your pocket."
+    },
+    {
+      "id": "find",
+      "vo": "Search for a room, typos and all, and see how many seats are free right now. Your favourites and recent spots are always one tap away."
+    },
+    {
+      "id": "seat",
+      "vo": "Open the room and see its real floor plan. Your friends are already here. Tap any free seat, confirm, and it's yours for fifteen minutes."
+    },
+    {
+      "id": "checkin",
+      "vo": "When you arrive, scan the QR code on your table. Not there in time? The seat goes back to everyone else. Check in, and you've got two hours."
+    },
+    {
+      "id": "break",
+      "vo": "Need a coffee? Take a break, and your seat stays yours while you're gone."
+    },
+    {
+      "id": "fair",
+      "vo": "Extending opens twenty minutes before the end. In the last ten minutes, anyone can grab the seat. So nothing sits empty for long."
+    },
+    {
+      "id": "map",
+      "vo": "Not sure where to go? The 3D campus map stacks every floor, and lights up the study rooms you can book."
+    },
+    {
+      "id": "friends",
+      "vo": "Studying with friends? Start a study party. One person books seats for everyone. No more racing to register."
+    },
+    {
+      "id": "live",
+      "vo": "And everything is live. When a friend accepts, joins your party, or your seats are booked, you hear about it right away."
+    },
+    {
+      "id": "install",
+      "vo": "Dark when you're up all night, light for the library at noon. And install it to your home screen, like any other app."
+    },
+    {
+      "id": "outro",
+      "vo": "Admins get a full dashboard to lay out rooms, print QR codes, and watch occupancy. Built by The Wurst Team at the ETH Zurich hackathon. Study Spaces. Find your seat, and get to work."
+    }
+  ]
+}

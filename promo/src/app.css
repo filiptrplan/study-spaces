@@ -1,0 +1,13 @@
+/* The frontend's real styles: tokens, Mantine, the ui-* classes. */
+@import '../../frontend/src/styles.css';
+@import './light.css';
+@source '../../frontend/src';
+@source '.';
+
+/* The film draws every frame from the frame number, so nothing may animate on its own. */
+.promo-app *,
+.promo-app *::before,
+.promo-app *::after {
+  animation: none !important;
+  transition: none !important;
+}
